@@ -333,7 +333,7 @@ class AudioSchedulerApp:
         sys.exit()
 
     def create_image(self):
-        img = Image.open("ASP_icon.png")
+        img = Image.open("ASP_icon.ico")
         return img
 
     def create_tray_icon(self):
@@ -348,3 +348,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = AudioSchedulerApp(root)
     root.mainloop()
+
