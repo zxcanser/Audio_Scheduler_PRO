@@ -22,6 +22,7 @@ LOG_FILE = "log.txt"
 class AudioSchedulerApp:
     def __init__(self, root):
         self.root = root
+        self.root.iconbitmap("ASP_icon.ico")
         self.root.title("Audio Scheduler PRO")
         self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
 
@@ -30,10 +31,12 @@ class AudioSchedulerApp:
         self.load_schedule()
 
         self.file_path = tk.StringVar()
+        self.file_name = tk.StringVar()
         self.time_str = tk.StringVar()
         self.volume = tk.DoubleVar(value=0.8)
 
         self.playing_thread = None
+        self.is_playing = False # Флаг для отслеживания состояния воспроизведения
 
         self.build_ui()
         self.start_scheduler()
@@ -43,25 +46,25 @@ class AudioSchedulerApp:
 
     def build_ui(self):
         tk.Label(self.root, text="Аудиофайл:").grid(row=0, column=0)
-        tk.Entry(self.root, textvariable=self.file_path, width=40).grid(row=0, column=1)
+        tk.Entry(self.root, textvariable=self.file_name, width=40).grid(row=0, column=1)
         tk.Button(self.root, text="Выбрать", command=self.browse_file, width=10, height=1).grid(row=0, column=2)
 
-        tk.Label(self.root, text="Время (ЧЧ:ММ):").grid(row=1, column=0)
+        tk.Label(self.root, text="Время:").place(x=46, y=25)
 
         # Поле для ввода часов
         self.hours_var = tk.StringVar()
-        self.hours_entry = tk.Entry(self.root, textvariable=self.hours_var, width=2)
+        self.hours_entry = tk.Entry(self.root, textvariable=self.hours_var, width=3)
         self.hours_entry.place(x=108, y=25)
 
         # Двоеточие между часами и минутами
-        tk.Label(self.root, text=":").place(x=123, y=25)
+        tk.Label(self.root, text=":").place(x=130, y=25)
 
         # Поле для ввода минут
         self.minutes_var = tk.StringVar()
-        self.minutes_entry = tk.Entry(self.root, textvariable=self.minutes_var, width=2)
-        self.minutes_entry.place(x=130, y=25)
+        self.minutes_entry = tk.Entry(self.root, textvariable=self.minutes_var, width=3)
+        self.minutes_entry.place(x=138, y=25)
 
-        #tk.Entry(self.root, textvariable=self.time_str, width=10).place(x=108, y=25)
+        #tk.Entry(self.root, textvariable=self.time_str, width=10).place(x=108, y=25) #Запасное окно ввода времени
 
         tk.Button(self.root, text="Добавить", command=self.add_schedule, width=10, height=1).grid(row=1, column=2)
 
@@ -72,8 +75,9 @@ class AudioSchedulerApp:
 
         self.root.bind("<Return>", self.add_schedule_from_key)  # Enter
         self.root.bind("<Delete>", self.delete_schedule_from_key)  # Delete
+        self.root.bind("<space>", self.play_stop_from_key)  # Play/Stop
 
-        tk.Button(self.root, text="Прослушать", command=self.test_play, width=10, height=1).grid(row=4, column=0)
+        tk.Button(self.root, text="Прослушать", command=self.play, width=10, height=1).grid(row=4, column=0)
         tk.Button(self.root, text="Стоп", command=self.stop_audio, width=10, height=1).grid(row=5, column=0)
 
         tk.Label(self.root, text="Громкость").grid(row=5, column=1)
@@ -96,6 +100,9 @@ class AudioSchedulerApp:
         file = filedialog.askopenfilename(filetypes=[("Audio Files", "*.wav;*.mp3;*.flac;*.ogg")])
         if file:
             self.file_path.set(file)
+            filename = os.path.basename(file)
+            self.file_name.set(filename)  # Устанавливаем только имя файла в Entry
+
 
 
     # ================= Аудио устройства =================
@@ -175,14 +182,6 @@ class AudioSchedulerApp:
             self.register_jobs()
             self.update_listbox()
 
-    def add_schedule_from_key(self, event):
-        """Добавление записи при нажатии Enter"""
-        self.add_schedule()
-
-    def delete_schedule_from_key(self, event):
-        """Удаление записи при нажатии Delete"""
-        self.delete_schedule()
-
     def update_listbox(self):
         self.listbox.delete(0, tk.END)
         for t, f in sorted(self.schedule_data.items()):
@@ -195,17 +194,33 @@ class AudioSchedulerApp:
         """Воспроизводим звук уведомления перед основным действием"""
         notification_sound_file = "notification_sound.mp3"  # Путь к вашему файлу уведомления
         try:
+            # Загружаем аудиофайл уведомления
             data, samplerate = sf.read(notification_sound_file, dtype='float32')
             data *= self.volume.get()
 
-            sd.play(data, samplerate)
-            sd.wait()  # Дождитесь завершения воспроизведения
+            # Получаем выбранное аудио устройство
+            device_name = self.device_var.get()
+            devices = sd.query_devices()
+
+            # Находим id выбранного устройства
+            device_id = None
+            for i, d in enumerate(devices):
+                if d['name'] == device_name:
+                    device_id = i
+                    break
+
+            # Если найдено устройство, воспроизводим уведомление
+            if device_id is not None:
+                sd.play(data, samplerate, device=device_id)
+                sd.wait()  # Дождитесь завершения воспроизведения
+            else:
+                print("Устройство не найдено!")
         except Exception as e:
             print(f"Ошибка при воспроизведении уведомления: {e}")
 
-
     def play_audio(self, file):
         self.play_notification_sound()
+        self.is_playing = True
 
         try:
             device_name = self.device_var.get()
@@ -233,8 +248,9 @@ class AudioSchedulerApp:
             sd.stop()  # Останавливаем воспроизведение
             self.write_log("Audio stopped")
 
-    def test_play(self):
+    def play(self):
         file = self.file_path.get()
+        self.is_playing = True
 
         # Если файл не выбран в поле, то используем файл из списка
         if not file:
@@ -249,7 +265,25 @@ class AudioSchedulerApp:
         else:
             messagebox.showerror("Ошибка", "Файл не найден")
 
-    # ================= Scheduler loop =================
+    # ================= Управление клавишами ==============
+
+    def add_schedule_from_key(self, event):
+        """Добавление записи при нажатии Enter"""
+        self.add_schedule()
+
+    def delete_schedule_from_key(self, event):
+        """Удаление записи при нажатии Delete"""
+        self.delete_schedule()
+
+    def play_stop_from_key(self, event):
+        """Прослушивание и остановка при нажатии Space"""
+        if self.is_playing:
+            self.stop_audio()
+            self.is_playing = False
+        else:
+            self.play()
+
+    # ================= Цикл Планировщика =================
 
     def register_jobs(self):
         schedule.clear()
@@ -299,9 +333,7 @@ class AudioSchedulerApp:
         sys.exit()
 
     def create_image(self):
-        img = Image.new('RGB', (64, 64), color='blue')
-        d = ImageDraw.Draw(img)
-        d.rectangle((16, 16, 48, 48), fill='white')
+        img = Image.open("ASP_icon.png")
         return img
 
     def create_tray_icon(self):
