@@ -18,7 +18,6 @@ CONFIG_FILE = "config.json"
 SCHEDULE_FILE = "schedule.json"
 LOG_FILE = "log.txt"
 
-
 class AudioSchedulerApp:
     def __init__(self, root):
         self.root = root
@@ -102,8 +101,6 @@ class AudioSchedulerApp:
             self.file_path.set(file)
             filename = os.path.basename(file)
             self.file_name.set(filename)  # Устанавливаем только имя файла в Entry
-
-
 
     # ================= Аудио устройства =================
 
@@ -343,9 +340,9 @@ class AudioSchedulerApp:
                             "Audio Scheduler PRO", menu)
         threading.Thread(target=icon.run, daemon=True).start()
 
-
 if __name__ == "__main__":
     root = tk.Tk()
     app = AudioSchedulerApp(root)
     root.mainloop()
+
 
