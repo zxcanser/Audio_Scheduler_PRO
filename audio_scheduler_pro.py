@@ -14,7 +14,7 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 
-#NIGGER
+#NIGGERsss
 #@zxcanser
 
 CONFIG_FILE = "config.json"
