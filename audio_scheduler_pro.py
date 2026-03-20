@@ -14,6 +14,9 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 
+#NIGGER
+#@zxcanser
+
 CONFIG_FILE = "config.json"
 SCHEDULE_FILE = "schedule.json"
 LOG_FILE = "log.txt"
